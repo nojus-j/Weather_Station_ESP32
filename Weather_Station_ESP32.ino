@@ -10,6 +10,7 @@
 const char* ssid = "s";
 const char* password = "s";
 String apiKey = "s";
+int WiFiStatus;
 
 // screen
 #define SCREEN_WIDTH 128
@@ -64,9 +65,7 @@ void setup() {
                   Adafruit_BMP280::FILTER_X16, // Filtering
                   Adafruit_BMP280::STANDBY_MS_500); // Standby time
 
-  // wifi setup
   initWiFi();
-
 }
 void loop() {
   updateCityWeather();
@@ -91,7 +90,7 @@ void loop() {
   if (screenMode == 0) {
     displayInfoLocal(bmp.readTemperature(),
             bmp.readPressure() / 100,
-            bmp.readAltitude(1009.9));
+            bmp.readAltitude());
   }
 
   if (screenMode == 1) {
@@ -155,6 +154,13 @@ void displayInfoCities() {
   display.setCursor(0, 0);
   display.print("CITY WEATHER");
 
+  if (WiFiStatus == -1) {
+    display.setCursor(0, 16);
+    display.println("OFFLINE MODE");
+    display.display();
+    return;
+  }
+
   display.setCursor(122, 56);
   display.print(screenMode);
 
@@ -184,7 +190,14 @@ void displayInfoWiFi() {
   display.setTextColor(SSD1306_WHITE);
 
   display.setCursor(0,0);
-  display.println("WiFi duomenys:");
+  display.println("WiFi INFO:");
+
+  if (WiFiStatus == -1) {
+    display.setCursor(0, 16);
+    display.println("OFFLINE MODE");
+    display.display();
+    return;
+  }
 
   display.setCursor(122, 56);
   display.print(screenMode);
@@ -232,7 +245,7 @@ float getCityTemp(String city) {
 void updateCityWeather() {
   unsigned long now = millis();
 
-  if (now - lastCityUpdate >= updateInterval) {
+  if (WiFiStatus == 1 && now - lastCityUpdate >= updateInterval) {
     lastCityUpdate = now;
 
     cachedKaunas = getCityTemp("Kaunas");
@@ -247,9 +260,19 @@ void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi ..");
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long startAttempt = millis();
+
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 8000) {
     Serial.print('.');
     delay(1000);
   }
-  Serial.println(WiFi.localIP());
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nConnected!");
+    Serial.println(WiFi.localIP());
+    WiFiStatus = 1;
+  } else {
+    Serial.println("\nFailed to connect");
+    WiFiStatus = -1;
+  }
 }
